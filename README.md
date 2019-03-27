@@ -14,5 +14,6 @@ To use this library in Origin C, just include the ```MathExpressionParser.h```. 
 void ParseMathExpression(const char* lpcszMathExpression, vector<string>& symbols);
 ```
 ```lpcszMathExpression```: for example, "sqrt(a^2+b^2)"
+
 ```symbols```: symbols in the math expression, in the above case, ["a", "b"]
 
