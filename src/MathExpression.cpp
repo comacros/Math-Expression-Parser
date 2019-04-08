@@ -130,7 +130,7 @@ bool MathExpression::Evaluate(vector<double>& results, const map<string, vector<
 
     size_t nSegmentSize = GetSegmentSize();
     size_t nTasks = nMaxLength / nSegmentSize;
-    if(numeric_limits<unsigned long long>::max() < nTasks)
+    if((numeric_limits<unsigned long long>::max)() < nTasks)
     {
         m_error = "Not Enough Memory.";
         return false;
