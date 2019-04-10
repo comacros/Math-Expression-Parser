@@ -20,6 +20,27 @@
 
 using namespace std;
 
+typedef struct MathExpressionOperator
+{
+	string repr;
+	size_t precedence;
+
+	friend bool operator>(const MathExpressionOperator& l, const MathExpressionOperator& r)
+	{
+		return l.precedence > r.precedence;
+	}
+
+} MathExpressionOperator;
+
+static MathExpressionOperator __MathExpression_operators__[] = {
+	{"+", 1},
+	{"-", 1},
+	{"*", 2},
+	{"/", 2},
+	{"^", 3}
+};
+
+
 inline bool EvalMathFunction_1(MathFunction_1 f, std::vector<double>& results, const std::vector<double>& values_1)
 {
     results.resize(values_1.size());
@@ -222,7 +243,12 @@ bool MathExpression::IsValidForName(char chr, bool bFirst)
 }
 bool MathExpression::IsValidOperator(char chr)
 {
-    return chr == '+' || chr == '-' || chr == '*' || chr == '/' || chr == '^';
+	for(size_t i = 0; i < sizeof(__MathExpression_operators__)/sizeof(MathExpressionOperator); i++)
+	{
+		if(__MathExpression_operators__[i].repr[0] == chr)
+			return true;
+	}
+	return false;
 }
 bool MathExpression::IsValidWhiteSpace(char chr)
 {
@@ -230,29 +256,17 @@ bool MathExpression::IsValidWhiteSpace(char chr)
 }
 bool MathExpression::IsOperatorWithGreaterPrecedence(const string& A, const string& B)
 {
-    if(A == "^")
-    {
-        if(B == "^")
-            return false;
-        else if(B == "+" || B == "-" || B == "*" || B == "/")
-            return true;
-    }
-    else if(A == "*" || A == "/")
-    {
-        if(B == "^" || B == "*" || B == "/")
-            return false;
-        else if(B == "+" || B == "-")
-            return true;
-    }
-    else if(A == "+" || A == "-")
-    {
-        if(B == "^" || B == "*" || B == "/" || B == "+" || B == "-")
-            return false;
-        else
-            return true;
-    }
+	// assumes that A and b are valid operators.
+	size_t offsetOpA = 0, offsetOpB = 0;
+	for(size_t i = 0; i < sizeof(__MathExpression_operators__)/sizeof(MathExpressionOperator); i++)
+	{
+		if(__MathExpression_operators__[i].repr == A)
+			offsetOpA = i;
+		else if(__MathExpression_operators__[i].repr == B)
+			offsetOpB = i;
+	}
 
-    return 0;
+	return __MathExpression_operators__[offsetOpA] > __MathExpression_operators__[offsetOpB];
 }
 bool MathExpression::GetSubExpressionLength(const char* lpcszExpr, size_t& nExprSubLength)    // leading '(' and ending ')' included
 {
