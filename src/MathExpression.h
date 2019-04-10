@@ -34,7 +34,6 @@ typedef double (*MathFunction_n)(double*, size_t);
 
 
 
-#endif // _MATH_EXPRESSION_H_
 
 // #pragma GCC visibility push(hidden)
 
@@ -75,3 +74,6 @@ private:
 };
 
 // #pragma GCC visibility pop
+
+
+#endif // _MATH_EXPRESSION_H_
