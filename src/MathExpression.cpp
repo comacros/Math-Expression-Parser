@@ -40,6 +40,21 @@ static MathExpressionOperator __MathExpression_operators__[] = {
     {"^", 3}
 };
 
+template <typename T>
+inline bool is_in_array(const T* ts, size_t n, const T t)
+{
+    bool bFound = false;
+    for(size_t i = 0; i < n; i++)
+    {
+        if(ts[i] == t)
+        {
+            bFound = true;
+            break;
+        }
+    }
+    return bFound;
+}
+
 
 inline bool EvalMathFunction_1(MathFunction_1 f, std::vector<double>& results, const std::vector<double>& values_1)
 {
@@ -181,6 +196,7 @@ bool MathExpression::Evaluate(vector<double>& results, const map<string, vector<
                 buffer.n = N;
                 buffer.p = const_cast<double*>(it->second.data() + i * nSegmentSize);
                 tasks[i]._symbols2[it->first] = buffer;
+                
             }
         }
     }
@@ -441,24 +457,22 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
     
     return true;
 }
-
-bool MathExpression::ValidatePreviousNext(const vector<MathExpressionNode>& nodes, size_t offset, const set<MathExprNodeType>& ValidPrevious, const set<MathExprNodeType>& ValidNext)
+bool MathExpression::ValidatePreviousNext(const vector<MathExpressionNode>& nodes, size_t offset, const MathExprNodeType* pValidPrevious, size_t nValidPrevious, const MathExprNodeType* pValidNext, size_t nValidNext)
 {
     if(offset >= nodes.size())
         return false;
     if(offset > 0)
     {
         MathExprNodeType prevtype = nodes[offset - 1].type;
-        if(ValidPrevious.find(prevtype) == ValidPrevious.end())
+        if(!is_in_array(pValidPrevious, nValidPrevious, prevtype))
             return false;
     }
     if(offset + 1 < nodes.size())
     {
         MathExprNodeType nexttype = nodes[offset + 1].type;
-        if(ValidNext.find(nexttype) == ValidNext.end())
+        if(!is_in_array(pValidNext, nValidNext, nexttype))
             return false;
     }
-    
     return true;
 }
 bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
@@ -492,15 +506,9 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
             {
                 // number can be the first or the last token
                 // only operator and separator are allowed before and after a number
-                set<MathExprNodeType> prev;
-                prev.insert(MathExprNodeType_Operator);
-                prev.insert(MathExprNodeType_Sign);
-                prev.insert(MathExprNodeType_Separator);
-                
-                set<MathExprNodeType> next;
-                next.insert(MathExprNodeType_Operator);
-                next.insert(MathExprNodeType_Separator);
-                if(!ValidatePreviousNext(nodes, i, prev, next))
+                static MathExprNodeType prev[] = {MathExprNodeType_Operator, MathExprNodeType_Sign, MathExprNodeType_Separator};
+                static MathExprNodeType next[] = {MathExprNodeType_Operator, MathExprNodeType_Separator};
+                if(!ValidatePreviousNext(nodes, i, prev, sizeof(prev)/sizeof(MathExprNodeType), next, sizeof(next)/sizeof(MathExprNodeType)))
                     return false;
                 
                 break;
@@ -510,18 +518,9 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                 // operator can not be the first or the last token
                 // leading PLUS/MINUS should have been handled by CheckUnm()
                 // only number, symbol, expression and function are allowed before and after operator
-                set<MathExprNodeType> prev;
-                prev.insert(MathExprNodeType_Number);
-                prev.insert(MathExprNodeType_Symbol);
-                prev.insert(MathExprNodeType_Expression);
-                
-                set<MathExprNodeType> next;
-                next.insert(MathExprNodeType_Number);
-                next.insert(MathExprNodeType_Symbol);
-                next.insert(MathExprNodeType_Function);
-                next.insert(MathExprNodeType_Expression);
-                next.insert(MathExprNodeType_Sign);
-                if(!ValidatePreviousNext(nodes, i, prev, next))
+                static MathExprNodeType prev[] = {MathExprNodeType_Number, MathExprNodeType_Symbol, MathExprNodeType_Expression};
+                static MathExprNodeType next[] = {MathExprNodeType_Number, MathExprNodeType_Symbol, MathExprNodeType_Function, MathExprNodeType_Expression, MathExprNodeType_Sign};
+                if(!ValidatePreviousNext(nodes, i, prev, sizeof(prev)/sizeof(MathExprNodeType), next, sizeof(next)/sizeof(MathExprNodeType)))
                     return false;
                 if(i == 0 || i == nodes.size() - 1)
                     return false;
@@ -531,15 +530,9 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
             case MathExprNodeType_Symbol:
             {
                 // symbol can not be before or after number, symbol, expression and function
-                set<MathExprNodeType> prev;
-                prev.insert(MathExprNodeType_Operator);
-                prev.insert(MathExprNodeType_Separator);
-                prev.insert(MathExprNodeType_Sign);
-                
-                set<MathExprNodeType> next;
-                next.insert(MathExprNodeType_Operator);
-                next.insert(MathExprNodeType_Separator);
-                if(!ValidatePreviousNext(nodes, i, prev, next))
+                static MathExprNodeType prev[] = {MathExprNodeType_Operator, MathExprNodeType_Separator, MathExprNodeType_Sign};
+                static MathExprNodeType next[] = {MathExprNodeType_Operator, MathExprNodeType_Separator};
+                if(!ValidatePreviousNext(nodes, i, prev, sizeof(prev)/sizeof(MathExprNodeType), next, sizeof(next)/sizeof(MathExprNodeType)))
                     return false;
                 
                 break;
@@ -549,14 +542,9 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                 // function can not be after number, symbol, expression and function
                 // must be before expression
                 
-                set<MathExprNodeType> prev;
-                prev.insert(MathExprNodeType_Operator);
-                prev.insert(MathExprNodeType_Separator);
-                prev.insert(MathExprNodeType_Sign);
-                
-                set<MathExprNodeType> next;
-                next.insert(MathExprNodeType_Expression);
-                if(!ValidatePreviousNext(nodes, i, prev, next))
+                static MathExprNodeType prev[] = {MathExprNodeType_Operator, MathExprNodeType_Separator, MathExprNodeType_Sign};
+                static MathExprNodeType next[] = {MathExprNodeType_Expression};
+                if(!ValidatePreviousNext(nodes, i, prev, sizeof(prev)/sizeof(MathExprNodeType), next, sizeof(next)/sizeof(MathExprNodeType)))
                     return false;
                 if(i == nodes.size() - 1)
                     return false;
@@ -570,21 +558,11 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                 // expression can be after function
                 // expression must have at least one child
                 
-                set<MathExprNodeType> prev;
-                prev.insert(MathExprNodeType_Operator);
-                prev.insert(MathExprNodeType_Function);
-                prev.insert(MathExprNodeType_Separator);
-                prev.insert(MathExprNodeType_Sign);
-                
-                set<MathExprNodeType> next;
-                next.insert(MathExprNodeType_Operator);
-                next.insert(MathExprNodeType_Separator);
-                
-                if(!ValidatePreviousNext(nodes, i, prev, next))
+                static MathExprNodeType prev[] = {MathExprNodeType_Operator, MathExprNodeType_Function, MathExprNodeType_Separator, MathExprNodeType_Sign};
+                static MathExprNodeType next[] = {MathExprNodeType_Operator, MathExprNodeType_Separator};
+                if(!ValidatePreviousNext(nodes, i, prev, sizeof(prev)/sizeof(MathExprNodeType), next, sizeof(next)/sizeof(MathExprNodeType)))
                     return false;
-                if(!node.children.size())
-                    return false;
-                if(!Validate(node.children))
+                if(!node.children.size() || !Validate(node.children))
                     return false;
                 
                 break;
@@ -592,17 +570,9 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
             case MathExprNodeType_Separator:
             {
                 // separator must be between number, symbol, expression and function
-                set<MathExprNodeType> prev;
-                prev.insert(MathExprNodeType_Number);
-                prev.insert(MathExprNodeType_Symbol);
-                prev.insert(MathExprNodeType_Expression);
-                set<MathExprNodeType> next;
-                next.insert(MathExprNodeType_Number);
-                next.insert(MathExprNodeType_Symbol);
-                next.insert(MathExprNodeType_Function);
-                next.insert(MathExprNodeType_Expression);
-                next.insert(MathExprNodeType_Sign);
-                if(!ValidatePreviousNext(nodes, i, prev, next))
+                static MathExprNodeType prev[] = {MathExprNodeType_Number, MathExprNodeType_Symbol, MathExprNodeType_Expression};
+                static MathExprNodeType next[] = {MathExprNodeType_Number, MathExprNodeType_Symbol, MathExprNodeType_Function, MathExprNodeType_Expression, MathExprNodeType_Sign};
+                if(!ValidatePreviousNext(nodes, i, prev, sizeof(prev)/sizeof(MathExprNodeType), next, sizeof(next)/sizeof(MathExprNodeType)))
                     return false;
                 if(i == 0 || i == nodes.size() - 1)
                     return false;
@@ -610,14 +580,9 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
             }
             case MathExprNodeType_Sign:
             {
-                set<MathExprNodeType> prev, next;
-                prev.insert(MathExprNodeType_Operator);
-                prev.insert(MathExprNodeType_Separator);
-                next.insert(MathExprNodeType_Number);
-                next.insert(MathExprNodeType_Symbol);
-                next.insert(MathExprNodeType_Function);
-                next.insert(MathExprNodeType_Expression);
-                if(!ValidatePreviousNext(nodes, i, prev, next))
+                static MathExprNodeType prev[] = {MathExprNodeType_Operator, MathExprNodeType_Separator};
+                static MathExprNodeType next[] = {MathExprNodeType_Number, MathExprNodeType_Symbol, MathExprNodeType_Function, MathExprNodeType_Expression};
+                if(!ValidatePreviousNext(nodes, i, prev, sizeof(prev)/sizeof(MathExprNodeType), next, sizeof(next)/sizeof(MathExprNodeType)))
                     return false;
                 if(i == nodes.size() - 1)
                     return false;
@@ -761,6 +726,8 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, MathExprNod
             if(it == bindings.end())
                 return false;
             OutputQueue.push_back(vector<double>(it->second.p, it->second.p + it->second.n));
+//            vector<double>& _values = OutputQueue.back();
+//            memcpy(_values.data(), it->second.p, sizeof(double) * it->second.n);
         }
         else if(nodetype == MathExprNodeType_Separator)
         {

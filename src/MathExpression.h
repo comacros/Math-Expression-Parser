@@ -60,7 +60,7 @@ protected:
     bool IsOperatorWithGreaterPrecedence(const string& A, const string& B);
     bool GetSubExpressionLength(const char* lpcszExpr, size_t& nExprSubLength);
     bool GetTokens(const char* lpcszExpr, vector<MathExpressionNode>& nodes, string& error);
-    bool ValidatePreviousNext(const vector<MathExpressionNode>& nodes, size_t offset, const set<MathExprNodeType>& ValidPrevious, const set<MathExprNodeType>& ValidNext);
+    bool ValidatePreviousNext(const vector<MathExpressionNode>& nodes, size_t offset, const MathExprNodeType* pValidPrevious, size_t nValidPrevious, const MathExprNodeType* pValidNext, size_t nValidNext);
     bool Validate(const vector<MathExpressionNode>& nodes);
     bool ShuntingYard(vector<MathExpressionNode>& results, const vector<MathExpressionNode>& nodes, string& error);
     size_t GetSegmentSize();
