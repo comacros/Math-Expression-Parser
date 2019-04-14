@@ -28,11 +28,16 @@ typedef struct MathExpressionNode
     vector<MathExpressionNode> children;
 } MathExpressionNode;
 
+
+typedef struct MathExprNodeEvalTaskBuffer
+{
+    double* p;
+    size_t n;
+} MathExprNodeEvalTaskBuffer;
+
 typedef double (*MathFunction_1)(double);
 typedef double (*MathFunction_2)(double, double);
 typedef double (*MathFunction_n)(double*, size_t);
-
-
 
 
 // #pragma GCC visibility push(hidden)
@@ -45,7 +50,7 @@ public:
     void Functions(set<string>& functions);
     void BindSymbols(const map<string, double>& symbols);
     bool Evaluate(vector<double>& results, const map<string, vector<double> >& symbols);
-
+    
 protected:
     bool IsBalanced(const char* lpcszExpr);
     bool IsValidForNumberBeginning(char chr);
@@ -59,7 +64,7 @@ protected:
     bool Validate(const vector<MathExpressionNode>& nodes);
     bool ShuntingYard(vector<MathExpressionNode>& results, const vector<MathExpressionNode>& nodes, string& error);
     size_t GetSegmentSize();
-    bool EvaluateEx(vector<double>& results, map<string, vector<double> >& bindings, const vector<MathExpressionNode>& nodes);
+    bool EvaluateEx(vector<double>& results, map<string, MathExprNodeEvalTaskBuffer>& bindings, const vector<MathExpressionNode>& nodes);
 private:
     void initialize_f1();
     void initialize_f2();
@@ -70,7 +75,7 @@ private:
     map<string, MathFunction_1> m_f1;
     map<string, MathFunction_2> m_f2;
     vector<MathExpressionNode> m_nodes;
-
+    
 };
 
 // #pragma GCC visibility pop

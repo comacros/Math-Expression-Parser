@@ -22,22 +22,22 @@ using namespace std;
 
 typedef struct MathExpressionOperator
 {
-	string repr;
-	size_t precedence;
-
-	friend bool operator>(const MathExpressionOperator& l, const MathExpressionOperator& r)
-	{
-		return l.precedence > r.precedence;
-	}
-
+    string repr;
+    size_t precedence;
+    
+    friend bool operator>(const MathExpressionOperator& l, const MathExpressionOperator& r)
+    {
+        return l.precedence > r.precedence;
+    }
+    
 } MathExpressionOperator;
 
 static MathExpressionOperator __MathExpression_operators__[] = {
-	{"+", 1},
-	{"-", 1},
-	{"*", 2},
-	{"/", 2},
-	{"^", 3}
+    {"+", 1},
+    {"-", 1},
+    {"*", 2},
+    {"/", 2},
+    {"^", 3}
 };
 
 
@@ -70,7 +70,7 @@ inline bool EvalMathFunction_2(MathFunction_2 f, std::vector<double>& results, c
     }
     else
         return false;
-
+    
     return true;
 }
 
@@ -82,24 +82,24 @@ MathExpression::MathExpression(const char* lpcszExpr)
         return;
     }
     m_expr.assign(lpcszExpr);
-
+    
     m_nodes.resize(0);
     if(!GetTokens(lpcszExpr, m_nodes, m_error))
         return;
-        
+    
     if(!Validate(m_nodes))
     {
         m_error = "Tokens Order Invalid.";
         return;
     }
-
+    
     initialize_f1();
     initialize_f2();
-
+    
     vector<MathExpressionNode> results;
     ShuntingYard(results, m_nodes, m_error);
     m_nodes = results;
-
+    
     return;
 }
 void MathExpression::Symbols(set<string>& symbols)
@@ -140,7 +140,7 @@ void MathExpression::BindSymbols(const map<string, double>& symbols)
 bool MathExpression::Evaluate(vector<double>& results, const map<string, vector<double> >& symbols)
 {
     results.resize(0);
-
+    
     // nMaxLength is 1 in case expression has no symbol.
     size_t nMaxLength = symbols.size() ? 0 : 1;
     for(map<string, vector<double> >::const_iterator it = symbols.begin(); it != symbols.end(); it++)
@@ -148,7 +148,7 @@ bool MathExpression::Evaluate(vector<double>& results, const map<string, vector<
         if(nMaxLength < it->second.size())
             nMaxLength = it->second.size();
     }
-
+    
     size_t nSegmentSize = GetSegmentSize();
     size_t nTasks = nMaxLength / nSegmentSize;
     if((numeric_limits<unsigned long long>::max)() < nTasks)
@@ -160,53 +160,52 @@ bool MathExpression::Evaluate(vector<double>& results, const map<string, vector<
         nTasks++;
     if(!nTasks)
         return false;
-
+    
     typedef struct {
         vector<double> _results;
         map<string, vector<double> > _symbols;
+        map<string, MathExprNodeEvalTaskBuffer> _symbols2;
     } MathExprNodeEvalTask;
-
+    
     vector<MathExprNodeEvalTask> tasks(nTasks);
     for(size_t i = 0; i < nTasks; i++)
     {
         for(map<string, vector<double> >::const_iterator it = symbols.begin(); it != symbols.end(); it++)
         {
             size_t N = (it->second.size() >= i * nSegmentSize + nSegmentSize ? nSegmentSize : it->second.size() - i * nSegmentSize);
-            if(it->second.size() == 1)
-                tasks[i]._symbols[it->first] = it->second;
-            else if(it->second.size() == 0)
+            if(it->second.size() == 0)
                 return false;
             else
             {
-                tasks[i]._symbols[it->first] = vector<double>(N);
-                vector<double>& segment = tasks[i]._symbols[it->first];
-                for(size_t j = 0; j < N; j++)
-                    segment[j] = it->second[i * nSegmentSize + j];
+                MathExprNodeEvalTaskBuffer buffer;
+                buffer.n = N;
+                buffer.p = const_cast<double*>(it->second.data() + i * nSegmentSize);
+                tasks[i]._symbols2[it->first] = buffer;
             }
         }
     }
-
+    
     signed long long N = static_cast<signed long long>(nTasks);
     size_t nEvalError = 0;
 #pragma omp parallel for reduction(+: nEvalError)
     for(signed long long i = 0; i < N; i++)
     {
-        if(!EvaluateEx(tasks[i]._results, tasks[i]._symbols, m_nodes))
+        if(!EvaluateEx(tasks[i]._results, tasks[i]._symbols2, m_nodes))
             nEvalError = 1;
         else
             nEvalError = 0;
     }
     if(nEvalError)
         return false;
-
+    
     size_t nResultSize = 0;
     for(size_t i = 0; i < tasks.size(); i++)
         nResultSize += tasks[i]._results.size();
-
+    
     results.reserve(nResultSize);
     for(size_t i = 0; i < tasks.size(); i++)
         results.insert(results.end(), tasks[i]._results.begin(), tasks[i]._results.end());
-
+    
     return true;
 }
 
@@ -243,12 +242,12 @@ bool MathExpression::IsValidForName(char chr, bool bFirst)
 }
 bool MathExpression::IsValidOperator(char chr)
 {
-	for(size_t i = 0; i < sizeof(__MathExpression_operators__)/sizeof(MathExpressionOperator); i++)
-	{
-		if(__MathExpression_operators__[i].repr[0] == chr)
-			return true;
-	}
-	return false;
+    for(size_t i = 0; i < sizeof(__MathExpression_operators__)/sizeof(MathExpressionOperator); i++)
+    {
+        if(__MathExpression_operators__[i].repr[0] == chr)
+            return true;
+    }
+    return false;
 }
 bool MathExpression::IsValidWhiteSpace(char chr)
 {
@@ -256,24 +255,24 @@ bool MathExpression::IsValidWhiteSpace(char chr)
 }
 bool MathExpression::IsOperatorWithGreaterPrecedence(const string& A, const string& B)
 {
-	// assumes that A and b are valid operators.
-	size_t offsetOpA = 0, offsetOpB = 0;
-	for(size_t i = 0; i < sizeof(__MathExpression_operators__)/sizeof(MathExpressionOperator); i++)
-	{
-		if(__MathExpression_operators__[i].repr == A)
-			offsetOpA = i;
-		else if(__MathExpression_operators__[i].repr == B)
-			offsetOpB = i;
-	}
-
-	return __MathExpression_operators__[offsetOpA] > __MathExpression_operators__[offsetOpB];
+    // assumes that A and b are valid operators.
+    size_t offsetOpA = 0, offsetOpB = 0;
+    for(size_t i = 0; i < sizeof(__MathExpression_operators__)/sizeof(MathExpressionOperator); i++)
+    {
+        if(__MathExpression_operators__[i].repr == A)
+            offsetOpA = i;
+        else if(__MathExpression_operators__[i].repr == B)
+            offsetOpB = i;
+    }
+    
+    return __MathExpression_operators__[offsetOpA] > __MathExpression_operators__[offsetOpB];
 }
 bool MathExpression::GetSubExpressionLength(const char* lpcszExpr, size_t& nExprSubLength)    // leading '(' and ending ')' included
 {
     size_t nExprLength = strlen(lpcszExpr);
     if(!nExprLength || lpcszExpr[0] != '(')
         return false;
-
+    
     size_t N = 0;
     for(size_t i = 0; i < nExprLength; i++)
     {
@@ -287,9 +286,9 @@ bool MathExpression::GetSubExpressionLength(const char* lpcszExpr, size_t& nExpr
             {
                 return false;
             }
-
+            
             N--;
-
+            
             if(N == 0)
             {
                 nExprSubLength = i + 1;
@@ -297,7 +296,7 @@ bool MathExpression::GetSubExpressionLength(const char* lpcszExpr, size_t& nExpr
             }
         }
     }
-
+    
     return false;
 }
 bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>& nodes, string& error)
@@ -309,11 +308,11 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
         MathExpressionNode node;
         node.values.resize(0);
         node.children.resize(0);
-
+        
         if(chr == '(')
         {
             node.type = MathExprNodeType_Expression;
-
+            
             size_t nSubSize = 0;
             if(!GetSubExpressionLength(lpcszExpr + i, nSubSize))
             {
@@ -325,14 +324,14 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
             vector<MathExpressionNode> children;
             if(!GetTokens(node.repr.c_str(), children, error))
                 return false;
-
+            
             node.children.assign(children.begin(), children.end());
-
+            
             if(nodes.size() && nodes.back().type == MathExprNodeType_Symbol)
                 nodes.back().type = MathExprNodeType_Function;
             
             nodes.push_back(node);
-
+            
             i += nSubSize;
             continue;
         }
@@ -348,7 +347,7 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
             node.type = MathExprNodeType_Symbol;
             node.repr.assign(lpcszExpr + i, j - i);
             nodes.push_back(node);
-
+            
             i = j;
             continue;
         }
@@ -356,12 +355,12 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
         {
             node.type = MathExprNodeType_Operator;
             node.repr = chr;
-
+            
             bool SignMerged = false;
-
+            
             if(nodes.size() == 0 || \
-                nodes.back().type == MathExprNodeType_Separator || \
-                nodes.back().type == MathExprNodeType_Operator  || nodes.back().type == MathExprNodeType_Sign)
+               nodes.back().type == MathExprNodeType_Separator || \
+               nodes.back().type == MathExprNodeType_Operator  || nodes.back().type == MathExprNodeType_Sign)
             {
                 node.type = MathExprNodeType_Sign;
                 if(node.repr != "+" && node.repr != "-")
@@ -369,7 +368,7 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
                     error = "Invalid Operator.";
                     return false;
                 }
-
+                
                 if(nodes.size())
                 {
                     if(nodes.back().type == MathExprNodeType_Sign)
@@ -397,7 +396,7 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
                 nodes.push_back(node);
             if(nodes.size() && nodes.back().type == MathExprNodeType_Sign && nodes.back().repr == "+")
                 nodes.pop_back();
-
+            
             i++;
             continue;
         }
@@ -406,15 +405,15 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
             char* pEnd;
             double f = strtod(lpcszExpr + i, &pEnd);
             size_t nNumberLength = pEnd - (lpcszExpr + i);
-
+            
             node.type = MathExprNodeType_Number;
             node.repr.assign(lpcszExpr + i, nNumberLength);
             node.values.push_back(f);
-
+            
             if(nodes.size() && nodes.back().type == MathExprNodeType_Sign && nodes.back().repr == "+")
                 nodes.pop_back();
             nodes.push_back(node);
-
+            
             i = pEnd - lpcszExpr;
             continue;
         }
@@ -438,8 +437,8 @@ bool MathExpression::GetTokens(const char* lpcszExpr, vector<MathExpressionNode>
             return false;
         }
     }
-
-
+    
+    
     return true;
 }
 
@@ -459,7 +458,7 @@ bool MathExpression::ValidatePreviousNext(const vector<MathExpressionNode>& node
         if(ValidNext.find(nexttype) == ValidNext.end())
             return false;
     }
-
+    
     return true;
 }
 bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
@@ -467,7 +466,7 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
      *  MathExprNodeType_Number,     MathExprNodeType_Operator, MathExprNodeType_Symbol, MathExprNodeType_Function,        *
      *  MathExprNodeType_Expression, MathExprNodeType_Sign,     MathExprNodeType_Separator                                 *
      ***********************************************************************************************************************/
-
+    
     // there must be at least one number / symbol / expression
     bool hasOperand = false;
     for(size_t i = 0; i < nodes.size(); i++)
@@ -480,16 +479,16 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
     }
     if(!hasOperand)
         return false;
-
+    
     for(size_t i = 0; i < nodes.size(); i++)
     {
         MathExpressionNode node = nodes[i];
-
+        
         // MathExprNodeType_Sign should not show here
         // in that it should be merged in GetToken()
         switch(node.type)
         {
-        case MathExprNodeType_Number:
+            case MathExprNodeType_Number:
             {
                 // number can be the first or the last token
                 // only operator and separator are allowed before and after a number
@@ -503,10 +502,10 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                 next.insert(MathExprNodeType_Separator);
                 if(!ValidatePreviousNext(nodes, i, prev, next))
                     return false;
-
+                
                 break;
             }
-        case MathExprNodeType_Operator:
+            case MathExprNodeType_Operator:
             {
                 // operator can not be the first or the last token
                 // leading PLUS/MINUS should have been handled by CheckUnm()
@@ -515,7 +514,7 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                 prev.insert(MathExprNodeType_Number);
                 prev.insert(MathExprNodeType_Symbol);
                 prev.insert(MathExprNodeType_Expression);
-
+                
                 set<MathExprNodeType> next;
                 next.insert(MathExprNodeType_Number);
                 next.insert(MathExprNodeType_Symbol);
@@ -526,71 +525,71 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                     return false;
                 if(i == 0 || i == nodes.size() - 1)
                     return false;
-
+                
                 break;
             }
-        case MathExprNodeType_Symbol: 
+            case MathExprNodeType_Symbol:
             {
                 // symbol can not be before or after number, symbol, expression and function
                 set<MathExprNodeType> prev;
                 prev.insert(MathExprNodeType_Operator);
                 prev.insert(MathExprNodeType_Separator);
                 prev.insert(MathExprNodeType_Sign);
-
+                
                 set<MathExprNodeType> next;
                 next.insert(MathExprNodeType_Operator);
                 next.insert(MathExprNodeType_Separator);
                 if(!ValidatePreviousNext(nodes, i, prev, next))
                     return false;
-
+                
                 break;
             }
-        case MathExprNodeType_Function: 
+            case MathExprNodeType_Function:
             {
                 // function can not be after number, symbol, expression and function
                 // must be before expression
-
+                
                 set<MathExprNodeType> prev;
                 prev.insert(MathExprNodeType_Operator);
                 prev.insert(MathExprNodeType_Separator);
                 prev.insert(MathExprNodeType_Sign);
-
+                
                 set<MathExprNodeType> next;
                 next.insert(MathExprNodeType_Expression);
                 if(!ValidatePreviousNext(nodes, i, prev, next))
                     return false;
                 if(i == nodes.size() - 1)
                     return false;
-
+                
                 break;
             }
-        case MathExprNodeType_Expression: 
+            case MathExprNodeType_Expression:
             {
                 // expression cannot be before/after number, symbol, expression
                 // expression cannot be before function
                 // expression can be after function
                 // expression must have at least one child
-
+                
                 set<MathExprNodeType> prev;
                 prev.insert(MathExprNodeType_Operator);
                 prev.insert(MathExprNodeType_Function);
                 prev.insert(MathExprNodeType_Separator);
                 prev.insert(MathExprNodeType_Sign);
-
+                
                 set<MathExprNodeType> next;
                 next.insert(MathExprNodeType_Operator);
                 next.insert(MathExprNodeType_Separator);
-
+                
                 if(!ValidatePreviousNext(nodes, i, prev, next))
                     return false;
                 if(!node.children.size())
                     return false;
                 if(!Validate(node.children))
                     return false;
-
+                
                 break;
             }
-        case MathExprNodeType_Separator: 
+            case MathExprNodeType_Separator:
             {
                 // separator must be between number, symbol, expression and function
                 set<MathExprNodeType> prev;
@@ -609,7 +608,7 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                     return false;
                 break;
             }
-        case MathExprNodeType_Sign:
+            case MathExprNodeType_Sign:
             {
                 set<MathExprNodeType> prev, next;
                 prev.insert(MathExprNodeType_Operator);
@@ -624,7 +623,7 @@ bool MathExpression::Validate(const vector<MathExpressionNode>& nodes) {
                     return false;
                 break;
             }
-        default: return false;
+            default: return false;
         }
     }
     return true;
@@ -635,10 +634,10 @@ bool MathExpression::ShuntingYard(vector<MathExpressionNode>& results, const vec
     
     if(nodes.size() == 0)
         return false;
-
+    
     vector<MathExpressionNode> OutputQueue;
     vector<MathExpressionNode> OperatorStack;
-
+    
     for(size_t i = 0; i < nodes.size(); i++)
     {
         if(nodes[i].type == MathExprNodeType_Number || nodes[i].type == MathExprNodeType_Symbol)
@@ -648,7 +647,7 @@ bool MathExpression::ShuntingYard(vector<MathExpressionNode>& results, const vec
             vector<MathExpressionNode> _results;
             if(!ShuntingYard(_results, nodes[i].children, error))
                 return false;
-
+            
             OutputQueue.insert(OutputQueue.end(), _results.begin(), _results.end());
         }
         else if(nodes[i].type == MathExprNodeType_Function)
@@ -659,11 +658,11 @@ bool MathExpression::ShuntingYard(vector<MathExpressionNode>& results, const vec
             for(size_t j = i + 1; j < nodes.size(); j++)
             {
                 if(nodes[j].type == MathExprNodeType_Number      || \
-                    nodes[j].type == MathExprNodeType_Symbol      || \
-                    nodes[j].type == MathExprNodeType_Function    || \
-                    nodes[j].type == MathExprNodeType_Expression  || \
-                    nodes[j].type == MathExprNodeType_Sign        || \
-                    (nodes[j].type == MathExprNodeType_Operator && nodes[j].repr != "+" && nodes[j].repr != "-"))
+                   nodes[j].type == MathExprNodeType_Symbol      || \
+                   nodes[j].type == MathExprNodeType_Function    || \
+                   nodes[j].type == MathExprNodeType_Expression  || \
+                   nodes[j].type == MathExprNodeType_Sign        || \
+                   (nodes[j].type == MathExprNodeType_Operator && nodes[j].repr != "+" && nodes[j].repr != "-"))
                 {
                     _nodes.push_back(nodes[j]);
                 }
@@ -680,9 +679,9 @@ bool MathExpression::ShuntingYard(vector<MathExpressionNode>& results, const vec
         {
             OutputQueue.insert(OutputQueue.end(), OperatorStack.begin(), OperatorStack.end());
             OperatorStack.resize(0);
-
+            
             // unnecessary to push back separator
-            //OutputQueue.push_back(nodes[i]);    
+            //OutputQueue.push_back(nodes[i]);
         }
         else if(nodes[i].type == MathExprNodeType_Operator && nodes[i].repr == "^")
         {
@@ -690,11 +689,11 @@ bool MathExpression::ShuntingYard(vector<MathExpressionNode>& results, const vec
             for(size_t j = i + 1; j < nodes.size(); j++)
             {
                 if(nodes[j].type == MathExprNodeType_Number     || \
-                    nodes[j].type == MathExprNodeType_Symbol     || \
-                    nodes[j].type == MathExprNodeType_Function   || \
-                    nodes[j].type == MathExprNodeType_Expression || \
-                    nodes[j].type == MathExprNodeType_Sign       || \
-                    (nodes[j].type == MathExprNodeType_Operator && nodes[j].repr == "^"))
+                   nodes[j].type == MathExprNodeType_Symbol     || \
+                   nodes[j].type == MathExprNodeType_Function   || \
+                   nodes[j].type == MathExprNodeType_Expression || \
+                   nodes[j].type == MathExprNodeType_Sign       || \
+                   (nodes[j].type == MathExprNodeType_Operator && nodes[j].repr == "^"))
                 {
                     _nodes.push_back(nodes[j]);
                 }
@@ -715,7 +714,7 @@ bool MathExpression::ShuntingYard(vector<MathExpressionNode>& results, const vec
                 {
                     MathExprNodeType toptype = OperatorStack.back().type;
                     string toprepr = OperatorStack.back().repr;
-
+                    
                     if(toptype == MathExprNodeType_Function || !IsOperatorWithGreaterPrecedence(nodes[i].repr, toprepr))
                     {
                         OutputQueue.push_back(OperatorStack.back());
@@ -727,16 +726,16 @@ bool MathExpression::ShuntingYard(vector<MathExpressionNode>& results, const vec
             }
             
             OperatorStack.push_back(nodes[i]);
-
+            
         }
     }
-
+    
     for(size_t i = OperatorStack.size(); i >= 1; i--)
         OutputQueue.push_back(OperatorStack[i - 1]);
-
+    
     results.resize(0);
     results.insert(results.end(), OutputQueue.begin(), OutputQueue.end());
-
+    
     return true;
 }
 size_t MathExpression::GetSegmentSize()
@@ -744,13 +743,13 @@ size_t MathExpression::GetSegmentSize()
     // to-do: calculate segment size according to available memory.
     return 128 * 1024 * 1;  // 1MB for 131,072 doubles
 }
-bool MathExpression::EvaluateEx(vector<double>& results, map<string, vector<double> >& bindings, const vector<MathExpressionNode>& nodes)
+bool MathExpression::EvaluateEx(vector<double>& results, map<string, MathExprNodeEvalTaskBuffer>& bindings, const vector<MathExpressionNode>& nodes)
 {
     results.resize(0);
-
+    
     vector<vector<double> > OutputQueue;
     OutputQueue.reserve(nodes.size());
-
+    
     for(size_t i = 0; i < nodes.size(); i++)
     {
         MathExprNodeType nodetype = nodes[i].type;
@@ -758,10 +757,10 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, vector<doub
             OutputQueue.push_back(nodes[i].values);
         else if(nodetype == MathExprNodeType_Symbol)
         {
-            map<string, vector<double> >::iterator it = bindings.find(string(nodes[i].repr));
+            map<string, MathExprNodeEvalTaskBuffer>::iterator it = bindings.find(string(nodes[i].repr));
             if(it == bindings.end())
                 return false;
-            OutputQueue.push_back(it->second);
+            OutputQueue.push_back(vector<double>(it->second.p, it->second.p + it->second.n));
         }
         else if(nodetype == MathExprNodeType_Separator)
         {
@@ -773,7 +772,7 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, vector<doub
             size_t nOutputQueues = OutputQueue.size();
             if(!nOutputQueues)
                 return false;
-
+            
             std::map<std::string, MathFunction_1>::iterator it1 = m_f1.find(std::string(nodes[i].repr));
             std::map<std::string, MathFunction_2>::iterator it2 = m_f2.find(std::string(nodes[i].repr));
             if(it1 != m_f1.end())
@@ -796,7 +795,7 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, vector<doub
         {
             size_t nOutputQueues = OutputQueue.size();
             if(nodes[i].repr == "+" || nodes[i].repr == "-" || nodes[i].repr == "*" || nodes[i].repr == "/" || nodes[i].repr == "^")
-            {   
+            {
                 if(nOutputQueues < 2)
                     return false;
                 size_t nOperand1Size = OutputQueue[nOutputQueues - 2].size();
@@ -814,7 +813,7 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, vector<doub
                     EvalMathFunction_2([](double A, double B){return A / B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
                 else if(nodes[i].repr == "^")
                     EvalMathFunction_2([](double A, double B){return pow(A, B);}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
-
+                
                 OutputQueue.pop_back();
             }
             else
@@ -834,13 +833,13 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, vector<doub
                 return false;
         }
     }
-
-
+    
+    
     if(OutputQueue.size() != 1)
         return false;
-
+    
     results = OutputQueue[0];
-
+    
     return true;
 }
 void MathExpression::initialize_f1()
