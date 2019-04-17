@@ -11,6 +11,7 @@
 #include <map>
 #include <limits>
 //#include <algorithm>
+//#include <functional>
 #include <cstdarg>
 
 //#define NDEBUG
@@ -55,12 +56,10 @@ inline bool is_in_array(const T* ts, size_t n, const T t)
     return bFound;
 }
 
-
-inline bool EvalMathFunction_1(MathFunction_1 f, std::vector<double>& results, const std::vector<double>& values_1)
+inline bool EvalMathFunction_1(MathFunction_1& f, double* inout, size_t n)
 {
-    results.resize(values_1.size());
-    for(size_t i = 0; i < values_1.size(); i++)
-        results[i] = f(values_1[i]);
+    for(size_t i = 0; i < n; i++)
+        inout[i] = f(inout[i]);
     return true;
 }
 inline bool EvalMathFunction_2(MathFunction_2 f, std::vector<double>& results, const std::vector<double>& values_1, const std::vector<double>& values_2)
@@ -82,6 +81,33 @@ inline bool EvalMathFunction_2(MathFunction_2 f, std::vector<double>& results, c
         results.resize(values_1.size());
         for(size_t i = 0; i < values_1.size(); i++)
             results[i] = f(values_1[i], values_2[0]);
+    }
+    else
+        return false;
+    
+    return true;
+}
+inline bool EvalMathFunction_2(MathFunction_2 f, std::vector<double>& values_1, std::vector<double>& values_2, size_t& nResultPosition)
+{
+    if(values_1.size() == values_2.size())
+    {
+        nResultPosition = 0;
+        for(size_t i = 0; i < values_1.size(); i++)
+            values_1[i] = f(values_1[i], values_2[i]);
+    }
+    else if(values_1.size() == 1)
+    {
+        nResultPosition = 1;
+        double value_1 = values_1[0];
+        for(size_t i = 0; i < values_2.size(); i++)
+            values_2[i] = f(value_1, values_2[i]);
+    }
+    else if(values_2.size() == 1)
+    {
+        nResultPosition = 0;
+        double value_2 = values_2[0];
+        for(size_t i = 0; i < values_1.size(); i++)
+            values_1[i] = f(values_1[i], value_2);
     }
     else
         return false;
@@ -746,13 +772,19 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, MathExprNod
             {
                 if(nOutputQueues < 1)
                     return false;
-                EvalMathFunction_1(it1->second, OutputQueue[nOutputQueues - 1], OutputQueue[nOutputQueues - 1]);
+                EvalMathFunction_1(it1->second, OutputQueue.back().data(), OutputQueue.back().size());
             }
             else if(it2 != m_f2.end())
             {
                 if(nOutputQueues < 2)
                     return false;
+//                size_t nResultPosition;
+//                EvalMathFunction_2(it2->second, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
                 EvalMathFunction_2(it2->second, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
+//                if(nResultPosition == 0)
+//                    ;
+//                else if(nResultPosition == 1)
+//                    OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
                 OutputQueue.pop_back();
             }
             else
@@ -771,15 +803,40 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, MathExprNod
                     return false;
                 
                 if(nodes[i].repr == "+")
-                    EvalMathFunction_2([](double A, double B){return A + B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
+                {
+                    size_t nResultPosition;
+                    EvalMathFunction_2([](double A, double B){return A + B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    if(nResultPosition == 1)
+                        OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
+                }
                 else if(nodes[i].repr == "-")
-                    EvalMathFunction_2([](double A, double B){return A - B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
+                {
+                    size_t nResultPosition;
+                    EvalMathFunction_2([](double A, double B){return A - B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    if(nResultPosition == 1)
+                        OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
+                }
                 else if(nodes[i].repr == "*")
-                    EvalMathFunction_2([](double A, double B){return A * B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
+                {
+                    size_t nResultPosition;
+                    EvalMathFunction_2([](double A, double B){return A * B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    if(nResultPosition == 1)
+                        OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
+                }
                 else if(nodes[i].repr == "/")
-                    EvalMathFunction_2([](double A, double B){return A / B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
+                {
+                    size_t nResultPosition;
+                    EvalMathFunction_2([](double A, double B){return A / B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    if(nResultPosition == 1)
+                        OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
+                }
                 else if(nodes[i].repr == "^")
-                    EvalMathFunction_2([](double A, double B){return pow(A, B);}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1]);
+                {
+                    size_t nResultPosition;
+                    EvalMathFunction_2([](double A, double B){return pow(A, B);}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    if(nResultPosition == 1)
+                        OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
+                }
                 
                 OutputQueue.pop_back();
             }
