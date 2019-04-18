@@ -87,7 +87,8 @@ inline bool EvalMathFunction_2(MathFunction_2 f, std::vector<double>& results, c
     
     return true;
 }
-inline bool EvalMathFunction_2(MathFunction_2 f, std::vector<double>& values_1, std::vector<double>& values_2, size_t& nResultPosition)
+template<typename op>
+inline bool EvalMathFunction_2(std::vector<double>& values_1, std::vector<double>& values_2, size_t& nResultPosition, op f)
 {
     if(values_1.size() == values_2.size())
     {
@@ -805,35 +806,35 @@ bool MathExpression::EvaluateEx(vector<double>& results, map<string, MathExprNod
                 if(nodes[i].repr == "+")
                 {
                     size_t nResultPosition;
-                    EvalMathFunction_2([](double A, double B){return A + B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    EvalMathFunction_2(OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition, std::plus<double>());
                     if(nResultPosition == 1)
                         OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
                 }
                 else if(nodes[i].repr == "-")
                 {
                     size_t nResultPosition;
-                    EvalMathFunction_2([](double A, double B){return A - B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    EvalMathFunction_2(OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition, std::minus<double>());
                     if(nResultPosition == 1)
                         OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
                 }
                 else if(nodes[i].repr == "*")
                 {
                     size_t nResultPosition;
-                    EvalMathFunction_2([](double A, double B){return A * B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    EvalMathFunction_2(OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition, std::multiplies<double>());
                     if(nResultPosition == 1)
                         OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
                 }
                 else if(nodes[i].repr == "/")
                 {
                     size_t nResultPosition;
-                    EvalMathFunction_2([](double A, double B){return A / B;}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    EvalMathFunction_2(OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition, std::divides<double>());
                     if(nResultPosition == 1)
                         OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
                 }
                 else if(nodes[i].repr == "^")
                 {
                     size_t nResultPosition;
-                    EvalMathFunction_2([](double A, double B){return pow(A, B);}, OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition);
+                    EvalMathFunction_2(OutputQueue[nOutputQueues - 2], OutputQueue[nOutputQueues - 1], nResultPosition, [](double A, double B){return pow(A, B);});
                     if(nResultPosition == 1)
                         OutputQueue[nOutputQueues - 2] = std::move(OutputQueue[nOutputQueues - 1]);
                 }
